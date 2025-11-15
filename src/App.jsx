@@ -699,16 +699,195 @@ NOW respond using the settings above:`;
     }
   };
 
+  const renderPromptPanel = () => (
+    <div className="space-y-4 max-h-[calc(100vh-250px)] overflow-y-auto pr-1">
+      <div className="bg-white rounded-lg shadow-lg p-4">
+        <h3 className="font-semibold mb-2">Test Profile</h3>
+        <select
+          value={selectedProfile}
+          onChange={(e) => {
+            setSelectedProfile(e.target.value);
+            setMessages([]);
+          }}
+          className="w-full p-2 border rounded"
+        >
+          {Object.entries(testProfiles).map(([key, value]) => (
+            <option key={key} value={key}>
+              {value.name}
+            </option>
+          ))}
+        </select>
+        <div className="mt-3 text-sm text-gray-600 bg-gray-50 rounded p-2">
+          <div className="flex justify-between items-center mb-1">
+            <span className="font-semibold text-gray-700">Context</span>
+            <button
+              onClick={() => startEditingProfileContext(selectedProfile)}
+              className="text-blue-600 text-xs hover:text-blue-800"
+            >
+              Edit
+            </button>
+          </div>
+          <p className="whitespace-pre-wrap text-xs">{profile.context}</p>
+        </div>
+        <div className="mt-3">
+          <button
+            onClick={() => setShowHealthDetails((prev) => !prev)}
+            className="w-full flex items-center justify-between text-xs px-3 py-2 bg-purple-50 text-purple-700 rounded hover:bg-purple-100"
+          >
+            <span>Health Snapshot</span>
+            <span>{showHealthDetails ? 'Hide' : 'Show'}</span>
+          </button>
+          {showHealthDetails && (
+            <div className="mt-2 space-y-3">
+              <div className="flex justify-end">
+                <button
+                  onClick={() => startEditingHealthData(selectedProfile)}
+                  className="text-xs text-blue-600 hover:text-blue-800"
+                >
+                  Edit Data
+                </button>
+              </div>
+              {profileMetricGroups.length > 0 ? (
+                profileMetricGroups.map((group) => (
+                  <div key={group.title} className="bg-white border rounded p-2 shadow-sm">
+                    <p className="text-xs font-semibold text-gray-700 mb-1">{group.title}</p>
+                    <div className="grid grid-cols-1 gap-1 text-xs text-gray-600 sm:grid-cols-2">
+                      {group.rows.map((row) => (
+                        <div key={`${group.title}-${row.label}`} className="flex justify-between gap-2">
+                          <span className="text-gray-500">{row.label}</span>
+                          <span className="font-semibold text-gray-800">{row.value}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <p className="text-xs text-gray-500 text-center">No wearable data available.</p>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="bg-white rounded-lg shadow-lg p-4">
+        <div className="flex justify-between items-center mb-3">
+          <h3 className="font-semibold">Persona Prompts</h3>
+          <span className="text-xs text-gray-500">Click to edit</span>
+        </div>
+        <div className="space-y-2">
+          {Object.entries(promptConfig.personas).map(([key, persona]) => (
+            <div key={key} className="border rounded p-2">
+              <div className="flex justify-between items-start mb-1">
+                <label className="flex items-center gap-2">
+                  <input
+                    type="radio"
+                    name="persona"
+                    checked={selectedPersona === key}
+                    onChange={() => {
+                      setSelectedPersona(key);
+                      setMessages([]);
+                    }}
+                  />
+                  <span className="font-semibold text-sm">{persona.name}</span>
+                </label>
+                <button onClick={() => startEditing('persona', key)} className="text-blue-600 hover:text-blue-800">
+                  <Edit3 size={14} />
+                </button>
+              </div>
+              <p className="text-xs text-gray-600 mb-1">{persona.description}</p>
+              <pre className="text-xs bg-gray-50 p-2 rounded overflow-x-auto">{persona.prompt.substring(0, 80)}...</pre>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="bg-white rounded-lg shadow-lg p-4">
+        <div className="flex justify-between items-center mb-3">
+          <h3 className="font-semibold">Phase Prompts</h3>
+          <span className="text-xs text-gray-500">Click to edit</span>
+        </div>
+        <div className="space-y-2">
+          {Object.entries(promptConfig.phases).map(([key, phase]) => (
+            <div key={key} className="border rounded p-2">
+              <div className="flex justify-between items-start mb-1">
+                <label className="flex items-center gap-2">
+                  <input
+                    type="radio"
+                    name="phase"
+                    checked={selectedPhase === key}
+                    onChange={() => {
+                      setSelectedPhase(key);
+                      setMessages([]);
+                    }}
+                  />
+                  <span className="font-semibold text-sm">
+                    {phase.name} ({phase.days})
+                  </span>
+                </label>
+                <button onClick={() => startEditing('phase', key)} className="text-blue-600 hover:text-blue-800">
+                  <Edit3 size={14} />
+                </button>
+              </div>
+              <pre className="text-xs bg-gray-50 p-2 rounded overflow-x-auto">{phase.prompt.substring(0, 80)}...</pre>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="bg-white rounded-lg shadow-lg p-4">
+        <div className="flex justify-between items-center mb-3">
+          <h3 className="font-semibold">Emotional State Prompts</h3>
+          <span className="text-xs text-gray-500">Click to edit</span>
+        </div>
+        <div className="space-y-2">
+          {Object.entries(promptConfig.emotions).map(([key, emotion]) => (
+            <div key={key} className="border rounded p-2">
+              <div className="flex justify-between items-start mb-1">
+                <label className="flex items-center gap-2">
+                  <input
+                    type="radio"
+                    name="emotion"
+                    checked={selectedEmotion === key}
+                    onChange={() => {
+                      setSelectedEmotion(key);
+                      setMessages([]);
+                    }}
+                  />
+                  <span className="font-semibold text-sm">{emotion.name}</span>
+                </label>
+                <button onClick={() => startEditing('emotion', key)} className="text-blue-600 hover:text-blue-800">
+                  <Edit3 size={14} />
+                </button>
+              </div>
+              <p className="text-xs text-gray-600 mb-1">{emotion.description}</p>
+              <pre className="text-xs bg-gray-50 p-2 rounded overflow-x-auto">{emotion.prompt.substring(0, 80)}...</pre>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="bg-white rounded-lg shadow-lg p-4">
+        <div className="flex justify-between items-center mb-3">
+          <h3 className="font-semibold">Global Rules</h3>
+          <button onClick={() => startEditing('global', 'global')} className="text-blue-600 hover:text-blue-800">
+            <Edit3 size={16} />
+          </button>
+        </div>
+        <pre className="text-xs bg-gray-50 p-2 rounded overflow-x-auto">{promptConfig.globalRules.prompt}</pre>
+      </div>
+    </div>
+  );
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 p-4">
       <div className="max-w-[1800px] mx-auto">
         <div className="bg-white rounded-lg shadow-lg p-6 mb-4">
           <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-            <div>
+            <div className="hidden md:block">
               <h1 className="text-3xl font-bold text-gray-800 mb-2">NextYou Prompt Engineering Workbench</h1>
               <p className="text-gray-600">Edit prompts in JSON format and test instantly with live AI</p>
             </div>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-2 hidden md:flex">
               <button
                 onClick={exportConfig}
                 className="flex items-center gap-2 px-4 py-2 bg-green-100 text-green-700 rounded-lg hover:bg-green-200"
@@ -741,7 +920,7 @@ NOW respond using the settings above:`;
           </div>
           {syncMessage && (
             <div
-              className={`mt-2 text-sm px-3 py-2 rounded ${
+              className={`hidden md:block mt-2 text-sm px-3 py-2 rounded ${
                 syncMessage.type === 'success' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'
               }`}
             >
@@ -749,7 +928,7 @@ NOW respond using the settings above:`;
             </div>
           )}
 
-          <div className="mt-4 bg-gradient-to-r from-blue-50 to-purple-50 border-l-4 border-blue-500 p-4">
+          <div className="hidden md:block mt-4 bg-gradient-to-r from-blue-50 to-purple-50 border-l-4 border-blue-500 p-4">
             <div className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
               <div>
                 <span className="font-semibold">Profile:</span>
@@ -771,8 +950,8 @@ NOW respond using the settings above:`;
           </div>
         </div>
 
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-          <div className="lg:col-span-1 space-y-4 max-h-[calc(100vh-250px)] overflow-y-auto pr-1">
+        <div className="lg:h-0 lg:grid grid-cols-1 gap-4 lg:grid-cols-3">
+          <div className="hidden lg:block lg:col-span-1 space-y-4 max-h-[calc(100vh-250px)] overflow-y-auto pr-1">
             <div className="bg-white rounded-lg shadow-lg p-4">
               <h3 className="font-semibold mb-2">Test Profile</h3>
               <select
@@ -970,7 +1149,7 @@ NOW respond using the settings above:`;
           </div>
 
           <div className="lg:col-span-2 space-y-4">
-            <div className="bg-white rounded-lg shadow-lg p-4">
+            <div className="hidden md:block bg-white rounded-lg shadow-lg p-4">
               <button
                 onClick={() => setShowFullPrompt((v) => !v)}
                 className="w-full flex items-center justify-between p-2 bg-yellow-50 rounded hover:bg-yellow-100"
@@ -985,7 +1164,7 @@ NOW respond using the settings above:`;
               )}
             </div>
 
-            <div className="bg-white rounded-lg shadow-lg flex flex-col h-[calc(100vh-400px)]">
+            <div className="bg-white rounded-lg shadow-lg flex flex-col h-[calc(100vh-120px)] lg:h-[calc(100vh-400px)]">
               <div className="p-4 border-b flex justify-between items-center">
                 <div>
                   <h2 className="text-xl font-semibold">AI Buddy (Testing)</h2>
