@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
 import {
-  Bot,
   Download,
   Edit3,
   Eye,
@@ -10,6 +9,7 @@ import {
   Upload,
   User,
 } from 'lucide-react';
+import buddyAvatar from './assets/dp.png';
 
 const OPENAI_API_KEY = import.meta.env.VITE_OPENAI_API_KEY ?? '';
 const OPENAI_MODEL = import.meta.env.VITE_OPENAI_MODEL ?? 'gpt-4o-mini';
@@ -855,7 +855,7 @@ NOW respond using the settings above:`;
             <div className="bg-white rounded-lg shadow-lg flex flex-col h-[calc(100vh-400px)]">
               <div className="p-4 border-b flex justify-between items-center">
                 <div>
-                  <h2 className="text-xl font-semibold">Live AI Testing</h2>
+                  <h2 className="text-xl font-semibold">AI Buddy (Testing)</h2>
                   <p className="text-sm text-gray-600">
                     {selectedPersona} • {selectedPhase} • {toEmotionLabel(selectedEmotion)}
                   </p>
@@ -871,7 +871,11 @@ NOW respond using the settings above:`;
               <div className="flex-1 overflow-y-auto p-4 space-y-3">
                 {messages.length === 0 && (
                   <div className="text-center text-gray-400 mt-8">
-                    <Bot size={48} className="mx-auto mb-4 opacity-50" />
+                    <img
+                      src={buddyAvatar}
+                      alt="AI Buddy avatar"
+                      className="w-24 h-24 mx-auto mb-4 rounded-full object-cover shadow"
+                    />
                     <p className="mb-4">Quick test messages:</p>
                     <div className="space-y-2">
                       {quickTestMessages.map((msg) => (
@@ -893,9 +897,11 @@ NOW respond using the settings above:`;
                     className={`flex gap-2 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
                   >
                     {msg.role === 'assistant' && (
-                      <div className="w-8 h-8 rounded-full bg-purple-500 flex items-center justify-center flex-shrink-0">
-                        <Bot size={16} className="text-white" />
-                      </div>
+                      <img
+                        src={buddyAvatar}
+                        alt="AI Buddy avatar"
+                        className="w-8 h-8 rounded-full object-cover flex-shrink-0 border border-purple-200 shadow-sm"
+                      />
                     )}
                     <div
                       className={`max-w-[75%] p-3 rounded-lg ${
@@ -921,9 +927,11 @@ NOW respond using the settings above:`;
 
                 {isLoading && (
                   <div className="flex gap-2 justify-start">
-                    <div className="w-8 h-8 rounded-full bg-purple-500 flex items-center justify-center">
-                      <Bot size={16} className="text-white" />
-                    </div>
+                    <img
+                      src={buddyAvatar}
+                      alt="AI Buddy avatar"
+                      className="w-8 h-8 rounded-full object-cover border border-purple-200 shadow-sm"
+                    />
                     <div className="bg-gray-100 p-3 rounded-lg">
                       <div className="flex gap-1">
                         <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" />
