@@ -14,6 +14,10 @@ import buddyAvatar from './assets/dp.png';
 const OPENAI_API_KEY = import.meta.env.VITE_OPENAI_API_KEY ?? '';
 const OPENAI_MODEL = import.meta.env.VITE_OPENAI_MODEL ?? 'gpt-4o-mini';
 const OPENAI_API_URL = 'https://api.openai.com/v1/chat/completions';
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL ?? '';
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY ?? '';
+const SUPABASE_CONFIG_TABLE = import.meta.env.VITE_SUPABASE_CONFIG_TABLE ?? 'prompt_configs';
+const SUPABASE_CONFIG_ID = import.meta.env.VITE_SUPABASE_CONFIG_ID ?? 'default';
 
 const STORAGE_KEYS = {
   config: 'nextyou_prompt_config',
@@ -215,6 +219,13 @@ const quickTestMessages = [
 
 const toEmotionLabel = (key) => key.replace(/_/g, ' ');
 
+const hasSupabaseSync = Boolean(SUPABASE_URL && SUPABASE_ANON_KEY);
+const supabaseHeaders = {
+  apikey: SUPABASE_ANON_KEY,
+  Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+  'Content-Type': 'application/json',
+};
+
 const formatHealthSnapshot = (profile) => {
   const snap = profile?.healthSnapshot;
   if (!snap) return 'No wearable data provided.';
@@ -333,6 +344,8 @@ function PromptEngineeringWorkbench() {
   const [healthDataEdit, setHealthDataEdit] = useState(null);
   const [healthDataDraft, setHealthDataDraft] = useState('');
   const [showHealthDetails, setShowHealthDetails] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [syncMessage, setSyncMessage] = useState(null);
 
   const messagesEndRef = useRef(null);
   const profile = testProfiles[selectedProfile];
@@ -584,6 +597,74 @@ NOW respond using the settings above:`;
     }
   };
 
+  const syncFromSupabase = async () => {
+    if (!hasSupabaseSync) {
+      setSyncMessage({ type: 'error', text: 'Supabase sync not configured.' });
+      return;
+    }
+    setIsSyncing(true);
+    setSyncMessage(null);
+    try {
+      const url = `${SUPABASE_URL}/rest/v1/${SUPABASE_CONFIG_TABLE}?id=eq.${encodeURIComponent(SUPABASE_CONFIG_ID)}&select=*`;
+      const response = await fetch(url, {
+        headers: supabaseHeaders,
+      });
+      if (!response.ok) {
+        throw new Error(`Supabase fetch failed (${response.status})`);
+      }
+      const rows = await response.json();
+      const payload = rows?.[0];
+      if (!payload) {
+        throw new Error('No config found in Supabase table.');
+      }
+      if (payload.prompt_config) {
+        setPromptConfig(payload.prompt_config);
+      }
+      if (payload.test_profiles) {
+        setTestProfiles(payload.test_profiles);
+      }
+      setSyncMessage({ type: 'success', text: 'Pulled latest prompts from Supabase.' });
+    } catch (error) {
+      setSyncMessage({ type: 'error', text: error.message });
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  const syncToSupabase = async () => {
+    if (!hasSupabaseSync) {
+      setSyncMessage({ type: 'error', text: 'Supabase sync not configured.' });
+      return;
+    }
+    setIsSyncing(true);
+    setSyncMessage(null);
+    try {
+      const url = `${SUPABASE_URL}/rest/v1/${SUPABASE_CONFIG_TABLE}`;
+      const payload = {
+        id: SUPABASE_CONFIG_ID,
+        prompt_config: promptConfig,
+        test_profiles: testProfiles,
+        updated_at: new Date().toISOString(),
+      };
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          ...supabaseHeaders,
+          Prefer: 'return=representation,resolution=merge-duplicates',
+        },
+        body: JSON.stringify(payload),
+      });
+      if (!response.ok) {
+        throw new Error(`Supabase update failed (${response.status})`);
+      }
+      setSyncMessage({ type: 'success', text: 'Uploaded prompts to Supabase.' });
+    } catch (error) {
+      setSyncMessage({ type: 'error', text: error.message });
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 p-4">
       <div className="max-w-[1800px] mx-auto">
@@ -613,8 +694,35 @@ NOW respond using the settings above:`;
                 <RefreshCw size={16} />
                 Reset
               </button>
+              {hasSupabaseSync && (
+                <>
+                  <button
+                    onClick={syncFromSupabase}
+                    disabled={isSyncing}
+                    className="flex items-center gap-2 px-4 py-2 bg-indigo-100 text-indigo-700 rounded-lg hover:bg-indigo-200 disabled:opacity-60"
+                  >
+                    Pull Cloud
+                  </button>
+                  <button
+                    onClick={syncToSupabase}
+                    disabled={isSyncing}
+                    className="flex items-center gap-2 px-4 py-2 bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 disabled:opacity-60"
+                  >
+                    Push Cloud
+                  </button>
+                </>
+              )}
             </div>
           </div>
+          {syncMessage && (
+            <div
+              className={`mt-2 text-sm px-3 py-2 rounded ${
+                syncMessage.type === 'success' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'
+              }`}
+            >
+              {syncMessage.text}
+            </div>
+          )}
 
           <div className="mt-4 bg-gradient-to-r from-blue-50 to-purple-50 border-l-4 border-blue-500 p-4">
             <div className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
