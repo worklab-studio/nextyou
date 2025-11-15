@@ -1,0 +1,16 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  font-family: 'Inter', 'SF Pro Display', 'Segoe UI', system-ui, sans-serif;
+}
+
+body {
+  margin: 0;
+  background-color: #eef2ff;
+}
+
+#root {
+  min-height: 100vh;
+}
