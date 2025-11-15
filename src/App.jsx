@@ -112,16 +112,79 @@ const TEST_PROFILES = {
     name: 'Aastha (Seeker)',
     persona: 'Seeker',
     context: 'Recovering from ACL surgery. Low energy, fragmented sleep, afternoon slump 2-5 PM.',
+    healthSnapshot: {
+      basics: { age: 29, height: "162 cm", weight: "58 kg", bmi: 22.1 },
+      sleep: { avgDuration: '5h 45m', deep: '55m', rem: '1h 15m', lastNight: '4h 50m' },
+      energy: { level: '2/10', trend: 'Crash 2-5 PM', notes: 'Still swollen knee + pain meds' },
+      mood: 'Drained but hopeful',
+      vitals: { restingHR: 72, hrv: 41, respiration: 17 },
+      readiness: 39,
+      stress: 'High',
+      stepsAvg: '3.1k',
+    },
   },
   priya: {
     name: 'Priya (Explorer)',
     persona: 'Explorer',
-    context: 'Working professional, moderate energy, curious, experiences brain fog.',
+    context:
+      'Working professional, moderate energy, curious, experiences brain fog in the afternoons while juggling product sprints.',
+    healthSnapshot: {
+      basics: { age: 33, height: "168 cm", weight: "62 kg", bmi: 22.0 },
+      sleep: { avgDuration: '7h 05m', deep: '1h 5m', rem: '1h 35m', lastNight: '6h 20m' },
+      energy: { level: '6/10', trend: 'Needs spark post-lunch', notes: 'Better on walking days' },
+      mood: 'Curious, slightly distracted',
+      vitals: { restingHR: 64, hrv: 58, respiration: 15 },
+      readiness: 68,
+      stress: 'Medium',
+      stepsAvg: '8.4k',
+    },
   },
   rahul: {
     name: 'Rahul (Tracker)',
     persona: 'Tracker',
     context: 'Stable baseline, tracks HRV/sleep, exercises 4x/week, optimization-focused.',
+    healthSnapshot: {
+      basics: { age: 41, height: "180 cm", weight: "80 kg", bmi: 24.7 },
+      sleep: { avgDuration: '6h 35m', deep: '1h 15m', rem: '1h 25m', lastNight: '6h 45m' },
+      energy: { level: '7/10', trend: 'Slight dip on heavy training days', notes: 'Chasing PR on squats' },
+      mood: 'Focused, analytical',
+      vitals: { restingHR: 58, hrv: 72, respiration: 13 },
+      readiness: 74,
+      stress: 'Low',
+      stepsAvg: '11.2k',
+    },
+  },
+  mira: {
+    name: 'Mira (Seeker)',
+    persona: 'Seeker',
+    context:
+      'Postpartum 5 months, interrupted sleep from night feeds, needs tiny wins to rebuild confidence.',
+    healthSnapshot: {
+      basics: { age: 31, height: "160 cm", weight: "66 kg", bmi: 25.8 },
+      sleep: { avgDuration: '5h 10m', deep: '40m', rem: '55m', lastNight: '4h 20m' },
+      energy: { level: '3/10', trend: 'Up on days with stroller walks', notes: 'Shoulders tight from nursing' },
+      mood: 'Tender but exhausted',
+      vitals: { restingHR: 76, hrv: 35, respiration: 18 },
+      readiness: 33,
+      stress: 'High',
+      stepsAvg: '4.5k',
+    },
+  },
+  jordan: {
+    name: 'Jordan (Explorer)',
+    persona: 'Explorer',
+    context:
+      'Remote product designer experimenting with new habits, wants playful nudges to stay consistent.',
+    healthSnapshot: {
+      basics: { age: 27, height: "175 cm", weight: "70 kg", bmi: 22.9 },
+      sleep: { avgDuration: '7h 40m', deep: '1h 20m', rem: '1h 45m', lastNight: '7h 05m' },
+      energy: { level: '7/10', trend: 'Slight slump 3 PM', notes: 'Skips lunch when prototyping' },
+      mood: 'Playful, restless',
+      vitals: { restingHR: 61, hrv: 65, respiration: 14 },
+      readiness: 71,
+      stress: 'Medium',
+      stepsAvg: '6.2k',
+    },
   },
 };
 
@@ -134,6 +197,106 @@ const quickTestMessages = [
 ];
 
 const toEmotionLabel = (key) => key.replace(/_/g, ' ');
+
+const formatHealthSnapshot = (profile) => {
+  const snap = profile?.healthSnapshot;
+  if (!snap) return 'No wearable data provided.';
+
+  const lines = [];
+  if (snap.basics) {
+    const basics = snap.basics;
+    lines.push(
+      `Basics: Age ${basics.age ?? '—'} • Height ${basics.height ?? '—'} • Weight ${basics.weight ?? '—'} • BMI ${
+        basics.bmi ?? '—'
+      }`,
+    );
+  }
+  if (snap.sleep) {
+    const sleep = snap.sleep;
+    lines.push(
+      `Sleep (avg 7d): ${sleep.avgDuration ?? '—'} total • Deep ${sleep.deep ?? '—'} • REM ${
+        sleep.rem ?? '—'
+      } • Last night ${sleep.lastNight ?? '—'}`,
+    );
+  }
+  if (snap.energy || snap.mood) {
+    lines.push(
+      `Energy & Mood: Energy ${snap.energy?.level ?? '—'} (${snap.energy?.trend ?? 'no trend'})${
+        snap.energy?.notes ? ` – ${snap.energy.notes}` : ''
+      }. Mood: ${snap.mood ?? '—'}.`,
+    );
+  }
+  if (snap.vitals) {
+    const vitals = snap.vitals;
+    lines.push(
+      `Wearable stats: Resting HR ${vitals.restingHR ?? '—'} • HRV ${vitals.hrv ?? '—'} • Respiration ${
+        vitals.respiration ?? '—'
+      }`,
+    );
+  }
+  const extras = [];
+  if (snap.readiness !== undefined) extras.push(`Readiness ${snap.readiness}`);
+  if (snap.stress) extras.push(`Stress ${snap.stress}`);
+  if (snap.stepsAvg) extras.push(`Steps avg ${snap.stepsAvg}`);
+  if (extras.length) {
+    lines.push(extras.join(' • '));
+  }
+
+  return lines.join('\n');
+};
+
+const buildProfileMetricGroups = (profile) => {
+  const snap = profile?.healthSnapshot;
+  if (!snap) return [];
+
+  const basics = snap.basics ?? {};
+  const sleep = snap.sleep ?? {};
+  const vitals = snap.vitals ?? {};
+  const energy = snap.energy ?? {};
+
+  const groups = [
+    {
+      title: 'Basics',
+      rows: [
+        basics.age && { label: 'Age', value: `${basics.age} yrs` },
+        basics.height && { label: 'Height', value: basics.height },
+        basics.weight && { label: 'Weight', value: basics.weight },
+        basics.bmi && { label: 'BMI', value: basics.bmi },
+      ].filter(Boolean),
+    },
+    {
+      title: 'Sleep (avg 7d)',
+      rows: [
+        sleep.avgDuration && { label: 'Total', value: sleep.avgDuration },
+        sleep.deep && { label: 'Deep', value: sleep.deep },
+        sleep.rem && { label: 'REM', value: sleep.rem },
+        sleep.lastNight && { label: 'Last night', value: sleep.lastNight },
+      ].filter(Boolean),
+    },
+    {
+      title: 'Energy & Mood',
+      rows: [
+        energy.level && { label: 'Energy', value: energy.level },
+        energy.trend && { label: 'Trend', value: energy.trend },
+        energy.notes && { label: 'Notes', value: energy.notes },
+        snap.mood && { label: 'Mood', value: snap.mood },
+        snap.stress && { label: 'Stress', value: snap.stress },
+      ].filter(Boolean),
+    },
+    {
+      title: 'Wearable stats',
+      rows: [
+        vitals.restingHR && { label: 'Resting HR', value: vitals.restingHR },
+        vitals.hrv && { label: 'HRV', value: vitals.hrv },
+        vitals.respiration && { label: 'Respiration', value: vitals.respiration },
+        snap.readiness !== undefined && { label: 'Readiness', value: snap.readiness },
+        snap.stepsAvg && { label: 'Steps avg', value: snap.stepsAvg },
+      ].filter(Boolean),
+    },
+  ];
+
+  return groups.filter((group) => group.rows.length > 0);
+};
 
 function PromptEngineeringWorkbench() {
   const [promptConfig, setPromptConfig] = useState(() => cloneConfig(DEFAULT_PROMPT_CONFIG));
@@ -153,6 +316,7 @@ function PromptEngineeringWorkbench() {
 
   const messagesEndRef = useRef(null);
   const profile = testProfiles[selectedProfile];
+  const profileMetricGroups = buildProfileMetricGroups(profile);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -163,11 +327,15 @@ function PromptEngineeringWorkbench() {
     const phasePrompt = promptConfig.phases[selectedPhase].prompt;
     const emotionPrompt = promptConfig.emotions[selectedEmotion].prompt;
     const globalPrompt = promptConfig.globalRules.prompt;
+    const healthSnapshot = formatHealthSnapshot(profile);
 
     return `You are NextYou AI Buddy.
 
 USER: ${profile.name}
 Context: ${profile.context}
+
+📊 HEALTH SNAPSHOT
+${healthSnapshot}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ${personaPrompt}
@@ -421,9 +589,11 @@ NOW respond using the settings above:`;
                 }}
                 className="w-full p-2 border rounded"
               >
-                <option value="aastha">Aastha (Seeker)</option>
-                <option value="priya">Priya (Explorer)</option>
-                <option value="rahul">Rahul (Tracker)</option>
+                {Object.entries(testProfiles).map(([key, value]) => (
+                  <option key={key} value={key}>
+                    {value.name}
+                  </option>
+                ))}
               </select>
               <div className="mt-3 text-sm text-gray-600 bg-gray-50 rounded p-2">
                 <div className="flex justify-between items-center mb-1">
@@ -437,6 +607,23 @@ NOW respond using the settings above:`;
                 </div>
                 <p className="whitespace-pre-wrap text-xs">{profile.context}</p>
               </div>
+              {profileMetricGroups.length > 0 && (
+                <div className="mt-3 space-y-3">
+                  {profileMetricGroups.map((group) => (
+                    <div key={group.title} className="bg-white border rounded p-2 shadow-sm">
+                      <p className="text-xs font-semibold text-gray-700 mb-1">{group.title}</p>
+                      <div className="grid grid-cols-1 gap-1 text-xs text-gray-600 sm:grid-cols-2">
+                        {group.rows.map((row) => (
+                          <div key={`${group.title}-${row.label}`} className="flex justify-between gap-2">
+                            <span className="text-gray-500">{row.label}</span>
+                            <span className="font-semibold text-gray-800">{row.value}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             <div className="bg-white rounded-lg shadow-lg p-4">
