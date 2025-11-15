@@ -15,7 +15,24 @@ const OPENAI_API_KEY = import.meta.env.VITE_OPENAI_API_KEY ?? '';
 const OPENAI_MODEL = import.meta.env.VITE_OPENAI_MODEL ?? 'gpt-4o-mini';
 const OPENAI_API_URL = 'https://api.openai.com/v1/chat/completions';
 
+const STORAGE_KEYS = {
+  config: 'nextyou_prompt_config',
+  profiles: 'nextyou_test_profiles',
+};
+
 const cloneConfig = (config) => JSON.parse(JSON.stringify(config));
+
+const loadStoredJson = (key, fallback) => {
+  if (typeof window === 'undefined') return fallback;
+  try {
+    const data = window.localStorage.getItem(key);
+    if (!data) return fallback;
+    return JSON.parse(data);
+  } catch (error) {
+    console.warn(`Failed to parse stored data for ${key}`, error);
+    return fallback;
+  }
+};
 
 const DEFAULT_PROMPT_CONFIG = {
   personas: {
@@ -299,8 +316,8 @@ const buildProfileMetricGroups = (profile) => {
 };
 
 function PromptEngineeringWorkbench() {
-  const [promptConfig, setPromptConfig] = useState(() => cloneConfig(DEFAULT_PROMPT_CONFIG));
-  const [testProfiles, setTestProfiles] = useState(() => cloneConfig(TEST_PROFILES));
+  const [promptConfig, setPromptConfig] = useState(() => loadStoredJson(STORAGE_KEYS.config, cloneConfig(DEFAULT_PROMPT_CONFIG)));
+  const [testProfiles, setTestProfiles] = useState(() => loadStoredJson(STORAGE_KEYS.profiles, cloneConfig(TEST_PROFILES)));
   const [selectedProfile, setSelectedProfile] = useState('aastha');
   const [selectedPersona, setSelectedPersona] = useState('Seeker');
   const [selectedPhase, setSelectedPhase] = useState('Soothe');
@@ -313,10 +330,27 @@ function PromptEngineeringWorkbench() {
   const [showFullPrompt, setShowFullPrompt] = useState(false);
   const [profileContextEdit, setProfileContextEdit] = useState(null);
   const [profileContextDraft, setProfileContextDraft] = useState('');
+  const [healthDataEdit, setHealthDataEdit] = useState(null);
+  const [healthDataDraft, setHealthDataDraft] = useState('');
+  const [showHealthDetails, setShowHealthDetails] = useState(false);
 
   const messagesEndRef = useRef(null);
   const profile = testProfiles[selectedProfile];
   const profileMetricGroups = buildProfileMetricGroups(profile);
+
+  useEffect(() => {
+    setShowHealthDetails(false);
+  }, [selectedProfile]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    window.localStorage.setItem(STORAGE_KEYS.config, JSON.stringify(promptConfig));
+  }, [promptConfig]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    window.localStorage.setItem(STORAGE_KEYS.profiles, JSON.stringify(testProfiles));
+  }, [testProfiles]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -504,6 +538,11 @@ NOW respond using the settings above:`;
     if (window.confirm('Reset all prompts to defaults?')) {
       setPromptConfig(cloneConfig(DEFAULT_PROMPT_CONFIG));
       setTestProfiles(cloneConfig(TEST_PROFILES));
+      setShowHealthDetails(false);
+      if (typeof window !== 'undefined') {
+        window.localStorage.removeItem(STORAGE_KEYS.config);
+        window.localStorage.removeItem(STORAGE_KEYS.profiles);
+      }
     }
   };
 
@@ -521,6 +560,28 @@ NOW respond using the settings above:`;
     });
     setProfileContextEdit(null);
     setProfileContextDraft('');
+  };
+
+  const startEditingHealthData = (key) => {
+    setHealthDataEdit(key);
+    const current = testProfiles[key].healthSnapshot ?? {};
+    setHealthDataDraft(JSON.stringify(current, null, 2));
+  };
+
+  const saveHealthData = () => {
+    if (!healthDataEdit) return;
+    try {
+      const parsed = JSON.parse(healthDataDraft || '{}');
+      setTestProfiles((prev) => {
+        const updated = cloneConfig(prev);
+        updated[healthDataEdit].healthSnapshot = parsed;
+        return updated;
+      });
+      setHealthDataEdit(null);
+      setHealthDataDraft('');
+    } catch (error) {
+      alert(`Invalid JSON: ${error.message}`);
+    }
   };
 
   return (
@@ -607,23 +668,44 @@ NOW respond using the settings above:`;
                 </div>
                 <p className="whitespace-pre-wrap text-xs">{profile.context}</p>
               </div>
-              {profileMetricGroups.length > 0 && (
-                <div className="mt-3 space-y-3">
-                  {profileMetricGroups.map((group) => (
-                    <div key={group.title} className="bg-white border rounded p-2 shadow-sm">
-                      <p className="text-xs font-semibold text-gray-700 mb-1">{group.title}</p>
-                      <div className="grid grid-cols-1 gap-1 text-xs text-gray-600 sm:grid-cols-2">
-                        {group.rows.map((row) => (
-                          <div key={`${group.title}-${row.label}`} className="flex justify-between gap-2">
-                            <span className="text-gray-500">{row.label}</span>
-                            <span className="font-semibold text-gray-800">{row.value}</span>
-                          </div>
-                        ))}
-                      </div>
+              <div className="mt-3">
+                <button
+                  onClick={() => setShowHealthDetails((prev) => !prev)}
+                  className="w-full flex items-center justify-between text-xs px-3 py-2 bg-purple-50 text-purple-700 rounded hover:bg-purple-100"
+                >
+                  <span>Health Snapshot</span>
+                  <span>{showHealthDetails ? 'Hide' : 'Show'}</span>
+                </button>
+                {showHealthDetails && (
+                  <div className="mt-2 space-y-3">
+                    <div className="flex justify-end">
+                      <button
+                        onClick={() => startEditingHealthData(selectedProfile)}
+                        className="text-xs text-blue-600 hover:text-blue-800"
+                      >
+                        Edit Data
+                      </button>
                     </div>
-                  ))}
-                </div>
-              )}
+                    {profileMetricGroups.length > 0 ? (
+                      profileMetricGroups.map((group) => (
+                        <div key={group.title} className="bg-white border rounded p-2 shadow-sm">
+                          <p className="text-xs font-semibold text-gray-700 mb-1">{group.title}</p>
+                          <div className="grid grid-cols-1 gap-1 text-xs text-gray-600 sm:grid-cols-2">
+                            {group.rows.map((row) => (
+                              <div key={`${group.title}-${row.label}`} className="flex justify-between gap-2">
+                                <span className="text-gray-500">{row.label}</span>
+                                <span className="font-semibold text-gray-800">{row.value}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="text-xs text-gray-500 text-center">No wearable data available.</p>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
 
             <div className="bg-white rounded-lg shadow-lg p-4">
@@ -978,6 +1060,57 @@ NOW respond using the settings above:`;
                   className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
                 >
                   Save Context
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+        {healthDataEdit && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-40 p-4">
+            <div className="bg-white rounded-lg shadow-xl max-w-3xl w-full">
+              <div className="p-4 border-b flex justify-between items-center">
+                <h3 className="text-lg font-semibold">
+                  Edit {testProfiles[healthDataEdit].name} Health Snapshot
+                </h3>
+                <button
+                  onClick={() => {
+                    setHealthDataEdit(null);
+                    setHealthDataDraft('');
+                  }}
+                  className="text-gray-500 hover:text-gray-700"
+                >
+                  ✕
+                </button>
+              </div>
+              <div className="p-4 space-y-4">
+                <textarea
+                  value={healthDataDraft}
+                  onChange={(e) => setHealthDataDraft(e.target.value)}
+                  className="w-full h-64 p-3 border rounded font-mono text-xs focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  placeholder='Enter JSON, e.g. {"basics": {"age": 32}}'
+                />
+                <div className="bg-purple-50 border-l-4 border-purple-400 p-3 text-xs text-gray-700 space-y-1">
+                  <p className="font-semibold">Tips:</p>
+                  <p>• Keep keys like basics, sleep, energy, vitals, readiness, stepsAvg.</p>
+                  <p>• Values should match how you want data verbatim in prompts.</p>
+                  <p>• Invalid JSON will be rejected with an error message.</p>
+                </div>
+              </div>
+              <div className="p-4 border-t flex justify-end gap-2">
+                <button
+                  onClick={() => {
+                    setHealthDataEdit(null);
+                    setHealthDataDraft('');
+                  }}
+                  className="px-4 py-2 bg-gray-100 text-gray-700 rounded hover:bg-gray-200"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={saveHealthData}
+                  className="px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700"
+                >
+                  Save Data
                 </button>
               </div>
             </div>
