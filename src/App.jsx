@@ -22,6 +22,7 @@ const SUPABASE_CONFIG_ID = import.meta.env.VITE_SUPABASE_CONFIG_ID ?? 'default';
 const STORAGE_KEYS = {
   config: 'nextyou_prompt_config',
   profiles: 'nextyou_test_profiles',
+  lastSyncAt: 'nextyou_last_supabase_sync',
 };
 
 const cloneConfig = (config) => JSON.parse(JSON.stringify(config));
@@ -346,6 +347,11 @@ function PromptEngineeringWorkbench() {
   const [showHealthDetails, setShowHealthDetails] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncMessage, setSyncMessage] = useState(null);
+  const [lastCloudSync, setLastCloudSync] = useState(() => {
+    if (typeof window === 'undefined') return null;
+    return window.localStorage.getItem(STORAGE_KEYS.lastSyncAt);
+  });
+  const [shouldAutoSync, setShouldAutoSync] = useState(hasSupabaseSync);
 
   const messagesEndRef = useRef(null);
   const profile = testProfiles[selectedProfile];
@@ -368,6 +374,40 @@ function PromptEngineeringWorkbench() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  useEffect(() => {
+    if (!hasSupabaseSync || !shouldAutoSync) return;
+    const run = async () => {
+      setIsSyncing(true);
+      try {
+        const payload = await fetchSupabaseConfig();
+        if (payload?.prompt_config) {
+          setPromptConfig(payload.prompt_config);
+        }
+        if (payload?.test_profiles) {
+          setTestProfiles(payload.test_profiles);
+        }
+        if (payload?.updated_at && typeof window !== 'undefined') {
+          setLastCloudSync(payload.updated_at);
+          window.localStorage.setItem(STORAGE_KEYS.lastSyncAt, payload.updated_at);
+        }
+      } catch (error) {
+        console.error('Initial Supabase sync failed:', error.message);
+        setSyncMessage({ type: 'error', text: error.message });
+      } finally {
+        setIsSyncing(false);
+      }
+    };
+    run();
+  }, [hasSupabaseSync, shouldAutoSync]);
+
+  useEffect(() => {
+    if (!hasSupabaseSync || !shouldAutoSync) return;
+    const handler = setTimeout(() => {
+      syncToSupabase();
+    }, 1500);
+    return () => clearTimeout(handler);
+  }, [promptConfig, testProfiles]);
 
   const buildSystemPrompt = () => {
     const personaPrompt = promptConfig.personas[selectedPersona].prompt;
@@ -597,6 +637,32 @@ NOW respond using the settings above:`;
     }
   };
 
+  const fetchSupabaseConfig = async () => {
+    const url = `${SUPABASE_URL}/rest/v1/${SUPABASE_CONFIG_TABLE}?id=eq.${encodeURIComponent(SUPABASE_CONFIG_ID)}&select=*`;
+    const response = await fetch(url, { headers: supabaseHeaders });
+    if (!response.ok) {
+      throw new Error(`Supabase fetch failed (${response.status})`);
+    }
+    const rows = await response.json();
+    return rows?.[0];
+  };
+
+  const pushSupabaseConfig = async (payload) => {
+    const url = `${SUPABASE_URL}/rest/v1/${SUPABASE_CONFIG_TABLE}`;
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        ...supabaseHeaders,
+        Prefer: 'return=representation,resolution=merge-duplicates',
+      },
+      body: JSON.stringify(payload),
+    });
+    if (!response.ok) {
+      throw new Error(`Supabase update failed (${response.status})`);
+    }
+    return response.json();
+  };
+
   const syncFromSupabase = async () => {
     if (!hasSupabaseSync) {
       setSyncMessage({ type: 'error', text: 'Supabase sync not configured.' });
@@ -605,15 +671,7 @@ NOW respond using the settings above:`;
     setIsSyncing(true);
     setSyncMessage(null);
     try {
-      const url = `${SUPABASE_URL}/rest/v1/${SUPABASE_CONFIG_TABLE}?id=eq.${encodeURIComponent(SUPABASE_CONFIG_ID)}&select=*`;
-      const response = await fetch(url, {
-        headers: supabaseHeaders,
-      });
-      if (!response.ok) {
-        throw new Error(`Supabase fetch failed (${response.status})`);
-      }
-      const rows = await response.json();
-      const payload = rows?.[0];
+      const payload = await fetchSupabaseConfig();
       if (!payload) {
         throw new Error('No config found in Supabase table.');
       }
@@ -622,6 +680,10 @@ NOW respond using the settings above:`;
       }
       if (payload.test_profiles) {
         setTestProfiles(payload.test_profiles);
+      }
+      setLastCloudSync(payload.updated_at ?? new Date().toISOString());
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem(STORAGE_KEYS.lastSyncAt, payload.updated_at ?? new Date().toISOString());
       }
       setSyncMessage({ type: 'success', text: 'Pulled latest prompts from Supabase.' });
     } catch (error) {
@@ -639,23 +701,16 @@ NOW respond using the settings above:`;
     setIsSyncing(true);
     setSyncMessage(null);
     try {
-      const url = `${SUPABASE_URL}/rest/v1/${SUPABASE_CONFIG_TABLE}`;
       const payload = {
         id: SUPABASE_CONFIG_ID,
         prompt_config: promptConfig,
         test_profiles: testProfiles,
         updated_at: new Date().toISOString(),
       };
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          ...supabaseHeaders,
-          Prefer: 'return=representation,resolution=merge-duplicates',
-        },
-        body: JSON.stringify(payload),
-      });
-      if (!response.ok) {
-        throw new Error(`Supabase update failed (${response.status})`);
+      await pushSupabaseConfig(payload);
+      setLastCloudSync(payload.updated_at);
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem(STORAGE_KEYS.lastSyncAt, payload.updated_at);
       }
       setSyncMessage({ type: 'success', text: 'Uploaded prompts to Supabase.' });
     } catch (error) {
@@ -695,22 +750,25 @@ NOW respond using the settings above:`;
                 Reset
               </button>
               {hasSupabaseSync && (
-                <>
+                <div className="flex flex-wrap gap-2 items-center">
+                  <span className="text-xs text-gray-500">
+                    {lastCloudSync ? `Cloud synced ${new Date(lastCloudSync).toLocaleString()}` : 'Awaiting first cloud sync'}
+                  </span>
                   <button
                     onClick={syncFromSupabase}
                     disabled={isSyncing}
-                    className="flex items-center gap-2 px-4 py-2 bg-indigo-100 text-indigo-700 rounded-lg hover:bg-indigo-200 disabled:opacity-60"
+                    className="flex items-center gap-2 px-3 py-2 bg-indigo-100 text-indigo-700 rounded-lg hover:bg-indigo-200 disabled:opacity-60"
                   >
                     Pull Cloud
                   </button>
                   <button
                     onClick={syncToSupabase}
                     disabled={isSyncing}
-                    className="flex items-center gap-2 px-4 py-2 bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 disabled:opacity-60"
+                    className="flex items-center gap-2 px-3 py-2 bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 disabled:opacity-60"
                   >
                     Push Cloud
                   </button>
-                </>
+                </div>
               )}
             </div>
           </div>
