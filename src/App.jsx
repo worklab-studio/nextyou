@@ -377,28 +377,7 @@ function PromptEngineeringWorkbench() {
 
   useEffect(() => {
     if (!hasSupabaseSync || !shouldAutoSync) return;
-    const run = async () => {
-      setIsSyncing(true);
-      try {
-        const payload = await fetchSupabaseConfig();
-        if (payload?.prompt_config) {
-          setPromptConfig(payload.prompt_config);
-        }
-        if (payload?.test_profiles) {
-          setTestProfiles(payload.test_profiles);
-        }
-        if (payload?.updated_at && typeof window !== 'undefined') {
-          setLastCloudSync(payload.updated_at);
-          window.localStorage.setItem(STORAGE_KEYS.lastSyncAt, payload.updated_at);
-        }
-      } catch (error) {
-        console.error('Initial Supabase sync failed:', error.message);
-        setSyncMessage({ type: 'error', text: error.message });
-      } finally {
-        setIsSyncing(false);
-      }
-    };
-    run();
+    syncFromSupabase();
   }, [hasSupabaseSync, shouldAutoSync]);
 
   useEffect(() => {
@@ -750,24 +729,12 @@ NOW respond using the settings above:`;
                 Reset
               </button>
               {hasSupabaseSync && (
-                <div className="flex flex-wrap gap-2 items-center">
-                  <span className="text-xs text-gray-500">
-                    {lastCloudSync ? `Cloud synced ${new Date(lastCloudSync).toLocaleString()}` : 'Awaiting first cloud sync'}
-                  </span>
-                  <button
-                    onClick={syncFromSupabase}
-                    disabled={isSyncing}
-                    className="flex items-center gap-2 px-3 py-2 bg-indigo-100 text-indigo-700 rounded-lg hover:bg-indigo-200 disabled:opacity-60"
-                  >
-                    Pull Cloud
-                  </button>
-                  <button
-                    onClick={syncToSupabase}
-                    disabled={isSyncing}
-                    className="flex items-center gap-2 px-3 py-2 bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 disabled:opacity-60"
-                  >
-                    Push Cloud
-                  </button>
+                <div className="text-xs text-gray-500 px-3 py-2 bg-purple-50 rounded">
+                  {isSyncing
+                    ? 'Syncing with Supabase...'
+                    : lastCloudSync
+                    ? `Auto-sync enabled • Last cloud update ${new Date(lastCloudSync).toLocaleString()}`
+                    : 'Auto-sync enabled • Awaiting first cloud sync'}
                 </div>
               )}
             </div>
